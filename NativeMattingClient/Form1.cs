@@ -428,6 +428,7 @@ public partial class Form1 : Form
     private async Task SaveCurrentFrameAsync()
     {
         _saveButton.Enabled = false;
+        var clock = Stopwatch.StartNew();
         SetStatus("Saving 4K PNG. Full-resolution inference is slower than preview...");
         try
         {
@@ -445,6 +446,7 @@ public partial class Form1 : Form
 
             using (frame)
             {
+                var provider = _matting?.ProviderName ?? "No model";
                 var output = await Task.Run(() =>
                 {
                     if (_matting == null)
@@ -460,7 +462,8 @@ public partial class Form1 : Form
                 {
                     var path = Path.Combine(_captureDir, $"native_rvm_4k_{DateTime.Now:yyyyMMdd_HHmmss}.png");
                     Cv2.ImWrite(path, output);
-                    SetStatus($"Saved: {path}");
+                    clock.Stop();
+                    SetStatus($"Saved: {path} | Provider {provider} | {clock.Elapsed.TotalSeconds:F1}s");
                 }
             }
         }
