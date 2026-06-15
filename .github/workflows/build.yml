@@ -5,17 +5,14 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   windows:
     runs-on: windows-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
 
@@ -29,7 +26,7 @@ jobs:
         run: dotnet publish NativeMattingClient/NativeMattingClient.csproj -c Release -r win-x64 --self-contained false -o artifacts/visual-matting-client
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: visual-matting-client-win-x64
           path: artifacts/visual-matting-client
