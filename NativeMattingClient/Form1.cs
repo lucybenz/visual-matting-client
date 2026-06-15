@@ -34,6 +34,7 @@ public partial class Form1 : Form
     private readonly Label _status = new() { AutoSize = false, Dock = DockStyle.Bottom, Height = 36, TextAlign = ContentAlignment.MiddleLeft };
 
     private readonly object _latestLock = new();
+    private readonly object _backgroundLock = new();
     private Mat? _latestFrame;
     private Mat? _latestComposited;
     private CancellationTokenSource? _cts;
@@ -72,6 +73,16 @@ public partial class Form1 : Form
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
         StopPipeline();
+        lock (_backgroundLock)
+        {
+            _backgroundImage?.Dispose();
+            _backgroundVideo?.Dispose();
+            _backgroundImage = null;
+            _backgroundVideo = null;
+        }
+
+        _matting?.Dispose();
+        _matting = null;
         base.OnFormClosing(e);
     }
 
@@ -478,8 +489,12 @@ public partial class Form1 : Form
             return;
         }
 
-        _backgroundImage?.Dispose();
-        _backgroundImage = img;
+        lock (_backgroundLock)
+        {
+            _backgroundImage?.Dispose();
+            _backgroundImage = img;
+        }
+
         _backgroundMode.SelectedIndex = 1;
         SetStatus($"Background image loaded: {dialog.FileName}");
     }
@@ -492,12 +507,18 @@ public partial class Form1 : Form
             return;
         }
 
-        _backgroundVideo?.Dispose();
-        _backgroundVideo = new VideoCapture(dialog.FileName);
-        if (!_backgroundVideo.IsOpened())
+        var video = new VideoCapture(dialog.FileName);
+        if (!video.IsOpened())
         {
+            video.Dispose();
             SetStatus("Background video open failed.");
             return;
+        }
+
+        lock (_backgroundLock)
+        {
+            _backgroundVideo?.Dispose();
+            _backgroundVideo = video;
         }
 
         _backgroundMode.SelectedIndex = 2;
@@ -507,25 +528,28 @@ public partial class Form1 : Form
     private Mat PrepareBackground(Mat reusable, int width, int height)
     {
         var mode = _backgroundMode.SelectedIndex;
-        if (mode == 1 && _backgroundImage != null)
+        lock (_backgroundLock)
         {
-            Cv2.Resize(_backgroundImage, reusable, new CvSize(width, height), 0, 0, InterpolationFlags.Linear);
-            return reusable;
-        }
-
-        if (mode == 2 && _backgroundVideo != null)
-        {
-            using var frame = new Mat();
-            if (!_backgroundVideo.Read(frame) || frame.Empty())
+            if (mode == 1 && _backgroundImage != null)
             {
-                _backgroundVideo.Set(VideoCaptureProperties.PosFrames, 0);
-                _backgroundVideo.Read(frame);
+                Cv2.Resize(_backgroundImage, reusable, new CvSize(width, height), 0, 0, InterpolationFlags.Linear);
+                return reusable;
             }
 
-            if (!frame.Empty())
+            if (mode == 2 && _backgroundVideo != null)
             {
-                Cv2.Resize(frame, reusable, new CvSize(width, height), 0, 0, InterpolationFlags.Linear);
-                return reusable;
+                using var frame = new Mat();
+                if (!_backgroundVideo.Read(frame) || frame.Empty())
+                {
+                    _backgroundVideo.Set(VideoCaptureProperties.PosFrames, 0);
+                    _backgroundVideo.Read(frame);
+                }
+
+                if (!frame.Empty())
+                {
+                    Cv2.Resize(frame, reusable, new CvSize(width, height), 0, 0, InterpolationFlags.Linear);
+                    return reusable;
+                }
             }
         }
 
