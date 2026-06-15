@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+*.user
+outputs/
+logs/
+models/*.onnx
+models/*.pth
+*.mp4
+*.mov
+*.avi
+*.mkv
